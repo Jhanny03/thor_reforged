@@ -15,24 +15,9 @@ pub struct Edge {
     pub to: u32,
 }
 
-pub type StatesCollection<D> = BTreeMap<String, D>;
+pub type NodeValueMap<D> = BTreeMap<u32, D>;
 
-pub enum NodeStates {
-    U8(GraphNodeState<u8>),
-    U32(GraphNodeState<u32>),
-    I32(GraphNodeState<i32>),
-    F32(GraphNodeState<f32>)
-}
-
-pub type GraphNodeState<D> = BTreeMap<u32, D>;
-
-pub enum EdgeStates {
-    U32(GraphEdgeStates<u32>),
-    I32(GraphEdgeStates<i32>),
-    F32(GraphEdgeStates<f32>)
-}
-
-pub type GraphEdgeStates<D> = BTreeMap<(u32, u32), D>;
+pub type EdgeValueMap<D> = BTreeMap<(u32, u32), D>;
 
 #[derive(Debug, Clone)]
 pub struct Graph {
@@ -104,10 +89,10 @@ impl Graph {
                          graph_path: &Vec<u32>,
                          l_map: &LinkMap,
                          roll_up_rule: &Box<dyn RollUp>,
-                         visibilities: &GraphNodeState<u8>)
-        -> GraphNodeState<f32>
+                         visibilities: &NodeValueMap<u8>)
+        -> NodeValueMap<f32>
     {
-        let mut new_state = GraphNodeState::new();
+        let mut new_state = NodeValueMap::new();
         for node in graph_path {
             let children = &l_map.get(node).unwrap().0;
             new_state.insert(*node, roll_up_rule.get_value(node, children, visibilities, &new_state));

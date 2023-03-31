@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>>{
     //let args: Vec<String> = env::args().collect();
     //dbg!(args);
 
-    let crit_config = STDCritConfigs { in_path: "./sample.csv".to_string()};
+    let crit_config = STDCritConfigs { in_path: "./links.csv".to_string()};
     let crit_input = STDCritInput {};
     let (mut graph, _crit_data) = crit_input.read(crit_config)?;
 

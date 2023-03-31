@@ -4,33 +4,30 @@ pub mod input {
     use std::fmt::{Debug, Display, Formatter};
     use std::marker::PhantomData;
 
-    pub struct CellNotInRowError {
-        pub row_i : usize,
-        pub cell_i: usize
+    pub struct CellNotFoundError {
+        pub cell_pos: (usize, usize),
     }
-    impl Error for CellNotInRowError {}
-    impl Debug for CellNotInRowError {
+    impl Error for CellNotFoundError {}
+    impl Debug for CellNotFoundError {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            write!(f, "Row {} does not contain cell {}. Cell is out of bounds.", self.row_i, self.cell_i)
+            write!(f, "The cell with pos ({}, {}) is out of bounds", self.cell_pos.0, self.cell_pos.1)
         }
     }
-    impl Display for CellNotInRowError {
+    impl Display for CellNotFoundError {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            write!(f, "Row {} does not contain cell {}. Cell is out of bounds.", self.row_i, self.cell_i)
+            write!(f, "The cell with pos ({}, {}) is out of bounds", self.cell_pos.0, self.cell_pos.1)
         }
     }
 
     pub struct CellNotNumericError<T> {
-        pub row_i : usize,
-        pub cell_i: usize,
+        pub cell_pos: (usize, usize),
         pub cell_val: String,
         pub phantom: PhantomData<T>
     }
     impl<T> Default for CellNotNumericError<T> {
         fn default() -> Self {
             CellNotNumericError {
-                row_i: 0,
-                cell_i: 0,
+                cell_pos: (0, 0),
                 cell_val: "".to_string(),
                 phantom: Default::default(),
             }
@@ -40,19 +37,22 @@ pub mod input {
     }
     impl<T> Debug for CellNotNumericError<T> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            write!(f, "The cell at row {}, index {}, with value: {}, should be a {} value", self.row_i, self.cell_i, self.cell_val, type_name::<T>())
+            write!(f, "The cell at ({}, {}), with value: {}, should be a {} value", self.cell_pos.0, self.cell_pos.1, self.cell_val, type_name::<T>())
         }
     }
     impl<T> Display for CellNotNumericError<T> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            write!(f, "The cell at row {}, index {}, with value: {}, should be a {} value", self.row_i, self.cell_i, self.cell_val, type_name::<T>())
+            write!(f, "The cell at ({}, {}), with value: {}, should be a {} value", self.cell_pos.0, self.cell_pos.1, self.cell_val, type_name::<T>())
         }
     }
 
-    pub struct GraphCreationError {
-        pub errors: Vec<String>
+    pub struct CreateError<T>
+        where T: Debug{
+        pub task: String,
+        pub errors: Vec<String>,
+        pub input: T,
     }
-    impl GraphCreationError {
+    impl<T: Debug> CreateError<T> {
         fn get_string_error(&self) -> String {
             let mut string_errors = "".to_string();
             for error in self.errors.iter() {
@@ -62,15 +62,18 @@ pub mod input {
             string_errors
         }
     }
-    impl Error for GraphCreationError {}
-    impl Debug for GraphCreationError {
+    impl<T: Debug> Error for CreateError<T> {}
+    impl<T: Debug> Debug for CreateError<T> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            write!(f, "The program encountered the following errors when creating a graph: {} ", self.get_string_error())
+            write!(f, "The program encountered the following errors when {}: \n{} The input was: {:?}"
+                   , self.task, self.get_string_error(), self.input)
         }
     }
-    impl Display for GraphCreationError {
+    impl<T: Debug> Display for CreateError<T> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            write!(f, "The program encountered the following errors when creating a graph: {} ", self.get_string_error())        }
+            write!(f, "The program encountered the following errors when {}: \n{} The input was: {:?}"
+                   , self.task, self.get_string_error(), self.input)
+        }
     }
 }
 

@@ -1,12 +1,12 @@
 use dyn_clone::DynClone;
 use crate::analyses::VISIBLE_VAL;
-use crate::network::{GraphNodeState};
+use crate::network::{NodeValueMap};
 
 const MAX_OPERABILITY: f32 = 1.0;
 const MIN_OPERABILITY: f32 = 0.0;
 
 pub trait RollUp : DynClone + Send {
-    fn get_value(&self, t_id: &u32, children: &Vec<u32>, visibilities: &GraphNodeState<u8>, values: &GraphNodeState<f32>) -> f32 {
+    fn get_value(&self, t_id: &u32, children: &Vec<u32>, visibilities: &NodeValueMap<u8>, values: &NodeValueMap<f32>) -> f32 {
         if children.is_empty() {
             return MAX_OPERABILITY;
         }
@@ -18,14 +18,14 @@ pub trait RollUp : DynClone + Send {
             }
         }
     }
-    fn compute_val(&self, t_id: &u32, children: &Vec<u32>, values: &GraphNodeState<f32>) -> f32;
+    fn compute_val(&self, t_id: &u32, children: &Vec<u32>, values: &NodeValueMap<f32>) -> f32;
 }
 
 #[derive(Clone)]
 pub struct OrRule {}
 
 impl RollUp for OrRule {
-    fn compute_val(&self, _t_id: &u32, children: &Vec<u32>, values: &GraphNodeState<f32>) -> f32 {
+    fn compute_val(&self, _t_id: &u32, children: &Vec<u32>, values: &NodeValueMap<f32>) -> f32 {
         let mut max = MIN_OPERABILITY;
         for child in children {
             match values.get(child) {

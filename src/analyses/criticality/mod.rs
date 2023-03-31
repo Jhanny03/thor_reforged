@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Index;
 use log::info;
 use crate::analyses::{Analysis, VISIBLE_VAL};
-use crate::network::{Graph, LinkMap, GraphNodeState};
+use crate::network::{Graph, LinkMap, NodeValueMap};
 use crate::roll_up::RollUp;
 use std::sync::mpsc;
 use std::thread;
@@ -98,7 +98,7 @@ impl Criticality {
             });
         }
 
-        let mut visited: HashSet<GraphNodeState<u8>> = HashSet::new();
+        let mut visited: HashSet<NodeValueMap<u8>> = HashSet::new();
 
         while !loop_condition.stop() {
             let visibility_state = states_generator.next_states();

@@ -3,10 +3,10 @@ pub mod visibility_states_gen {
     use dyn_clone::DynClone;
     use rand::{Rng, SeedableRng};
     use rand::rngs::{StdRng};
-    use crate::network::{GraphNodeState};
+    use crate::network::{NodeValueMap};
 
     pub trait VisGen: DynClone + Send {
-        fn next_states(&mut self) -> GraphNodeState<u8>;
+        fn next_states(&mut self) -> NodeValueMap<u8>;
         fn split_to_threads(&self, threads: u64) -> Vec<Box<dyn VisGen>>;
     }
 
@@ -16,12 +16,12 @@ pub mod visibility_states_gen {
     pub struct RandomGen {
         pub rng: StdRng,
         pub ids: HashSet<u32>,
-        pub off_chances: GraphNodeState<f32>
+        pub off_chances: NodeValueMap<f32>
     }
 
     impl VisGen for RandomGen {
-        fn next_states(&mut self) -> GraphNodeState<u8> {
-            let mut new_states = GraphNodeState::new();
+        fn next_states(&mut self) -> NodeValueMap<u8> {
+            let mut new_states = NodeValueMap::new();
             for id in &self.ids {
                 let rand: f32 = self.rng.gen();
                 let off_chance = self.off_chances.get(id).unwrap_or(&DEFAULT_OFF_CHANCE);
