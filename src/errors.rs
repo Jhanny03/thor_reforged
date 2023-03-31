@@ -2,6 +2,7 @@ pub mod input {
     use std::{error::Error, fmt};
     use std::any::type_name;
     use std::fmt::{Debug, Display, Formatter};
+    use std::marker::PhantomData;
 
     pub struct CellNotInRowError {
         pub row_i : usize,
@@ -19,20 +20,30 @@ pub mod input {
         }
     }
 
-    pub struct CellNotNumericError<'a, T> {
+    pub struct CellNotNumericError<T> {
         pub row_i : usize,
         pub cell_i: usize,
-        pub cell_val: &'a String,
-        pub val: T
+        pub cell_val: String,
+        pub phantom: PhantomData<T>
     }
-    impl<'a, T> Error for CellNotNumericError<'a, T> {
+    impl<T> Default for CellNotNumericError<T> {
+        fn default() -> Self {
+            CellNotNumericError {
+                row_i: 0,
+                cell_i: 0,
+                cell_val: "".to_string(),
+                phantom: Default::default(),
+            }
+        }
     }
-    impl<'a, T> Debug for CellNotNumericError<'a, T> {
+    impl<T> Error for CellNotNumericError<T> {
+    }
+    impl<T> Debug for CellNotNumericError<T> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             write!(f, "The cell at row {}, index {}, with value: {}, should be a {} value", self.row_i, self.cell_i, self.cell_val, type_name::<T>())
         }
     }
-    impl<'a, T> Display for CellNotNumericError<'a, T> {
+    impl<T> Display for CellNotNumericError<T> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             write!(f, "The cell at row {}, index {}, with value: {}, should be a {} value", self.row_i, self.cell_i, self.cell_val, type_name::<T>())
         }

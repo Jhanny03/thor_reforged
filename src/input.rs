@@ -1,7 +1,11 @@
+use std::collections::{BTreeMap, HashMap};
+use std::default::default;
 use std::error::Error;
 use std::fs::File;
+use std::ops::Index;
+use std::str::FromStr;
 use csv;
-use crate::network::{Graph};
+use crate::network::{Graph, StatesCollection, EdgeStates, GraphEdgeStates};
 use crate::{errors};
 use crate::analyses::criticality::CriticalityData;
 
@@ -15,7 +19,7 @@ use crate::errors::input::{CellNotNumericError, GraphCreationError};
 /// implementation. Most input structures will likely share similar code.
 
 /// List of rows (list of strings) obtained from reading a file.
-pub type StringMatrix = Vec<Vec<String>>;
+type StringMatrix = Vec<Vec<String>>;
 
 /// Node name used if the input fails to provide a proper name
 const DEFAULT_NODE_NAME: &str = "DEFAULT";
@@ -45,7 +49,7 @@ const DEFAULT_NODE_ID: u32 = 999999;
 ///
 /// Will return an io error if the file at the given path cannot be opened
 /// Will return an error if any rows in the csv file cannot be parsed
-pub fn read_csv(path: &str) -> Result<StringMatrix, Box<dyn Error>> {
+fn read_csv(path: &str) -> Result<StringMatrix, Box<dyn Error>> {
     let file = File::open(path)?;
     let mut reader = csv::ReaderBuilder::new()
         .from_reader(file);
@@ -60,6 +64,12 @@ pub fn read_csv(path: &str) -> Result<StringMatrix, Box<dyn Error>> {
     Ok(rows)
 }
 
+enum Column {
+    F32(String, bool, f32),
+    I32(String, bool, i32),
+    U32(String, bool, u32)
+}
+
 /// Creates a graph from a standard links 'string_matrix'.
 /// A standard link ['StringMatrix'] is a matrix where each row is an edge composed of 4
 /// components: from node name, from node id, to node name, to node id. The components should be
@@ -71,16 +81,52 @@ pub fn read_csv(path: &str) -> Result<StringMatrix, Box<dyn Error>> {
 /// The 'string_matrix' can be invalid if:
 /// * Each row has less or more than 4 components
 /// * The from node id and to node id values cannot casted into u32
-pub fn create_graph(string_matrix: &StringMatrix) -> Result<Graph, GraphCreationError> {
+fn create_graph(string_matrix: &StringMatrix, extra_columns: Vec<Column>) -> Result<Graph, GraphCreationError> {
     let mut graph = Graph::new();
     let mut errors: Vec<String> = vec![];
+
+    let mut states_collection: BTreeMap<String, EdgeStates> = StatesCollection::new();
+    for e_col in extra_columns {
+        fill_state_collection(&mut states_collection, &e_col);
+    }
 
     for (y, row) in string_matrix.into_iter().enumerate() {
         // Get the name and ID of the child and parent nodes
         let c_name = get_string_cell(&row, (0, y), &mut errors).unwrap_or(DEFAULT_NODE_NAME.to_string());
         let p_name = get_string_cell(&row, (2, y), &mut errors).unwrap_or(DEFAULT_NODE_NAME.to_string());
-        let c_id = get_u32_cell(&row, (1, y), &mut errors).unwrap_or(DEFAULT_NODE_ID);
-        let p_id = get_u32_cell(&row, (3, y), &mut errors).unwrap_or(DEFAULT_NODE_ID);
+        let c_id = get_from_str_cell(&row, (1, y), &mut errors).unwrap_or(DEFAULT_NODE_ID);
+        let p_id = get_from_str_cell(&row, (3, y), &mut errors).unwrap_or(DEFAULT_NODE_ID);
+
+        let mut i = 4;
+        for e_col in extra_columns {
+            match e_col {
+                Column::F32(name, required, default) => {
+                    let err = if required {&mut errors} else {&mut vec![]};
+                    let val = get_from_str_cell(&row, (i, y), err).unwrap_or(default);
+                    match states_collection.index(&name) {
+                        EdgeStates::F32(mut x) => { x.insert((c_id, p_id), val); }
+                        _ => {}
+                    }
+                }
+                Column::I32(name, required, default) => {
+                    let err = if required {&mut errors} else {&mut vec![]};
+                    let val = get_from_str_cell(&row, (i, y), err).unwrap_or(default);
+                    match states_collection.index(&name) {
+                        EdgeStates::I32(mut x) => { x.insert((c_id, p_id), val); }
+                        _ => {}
+                    }
+                }
+                Column::U32(name, required, default) => {
+                    let err = if required {&mut errors} else {&mut vec![]};
+                    let val = get_from_str_cell(&row, (i, y), err).unwrap_or(default);
+                    match states_collection.index(&name) {
+                        EdgeStates::U32(mut x) => { x.insert((c_id, p_id), val); }
+                        _ => {}
+                    }
+                }
+            }
+            i += 1;
+        }
         // Add both nodes and an edge connecting the two
         graph.add_node(c_name, c_id);
         graph.add_node(p_name, p_id);
@@ -94,6 +140,20 @@ pub fn create_graph(string_matrix: &StringMatrix) -> Result<Graph, GraphCreation
             errors
         })
     }
+}
+
+fn fill_state_collection(collection: &mut StatesCollection<EdgeStates>, e_col: &Column) {
+    match e_col {
+        Column::F32(name, required, default) => {
+            collection.insert(name.to_string(), EdgeStates::F32(GraphEdgeStates::new()));
+        }
+        Column::I32(name, required, default) => {
+            collection.insert(name.to_string(), EdgeStates::I32(GraphEdgeStates::new()));
+        }
+        Column::U32(name, required, default) => {
+            collection.insert(name.to_string(), EdgeStates::U32(GraphEdgeStates::new()));
+        }
+    };
 }
 
 /// Get a string value from a 'row' in a ['StringMatrix'] and the 'pos' of the value.
@@ -119,27 +179,24 @@ fn get_string_cell(row: &Vec<String>, pos: (usize, usize), errors: &mut Vec<Stri
     }
 }
 
-/// Call ['get_string_cell'] and then attempt to convert the result into u32
+/// Call ['get_string_cell'] and then attempt to convert the result to type T
 ///
 /// # Errors
 ///
 /// * Returns None if ['get_string_cell'] return None
-/// * Return None if the value at the given 'pos' cannot be converted to a u32
-fn get_u32_cell(row: &Vec<String>, pos: (usize, usize), errors: &mut Vec<String>) -> Option<u32> {
+/// * Return None if the value at the given 'pos' cannot be converted to type T
+fn get_from_str_cell<T>(row: &Vec<String>, pos: (usize, usize), errors: &mut Vec<String>) -> Option<T>
+where T: FromStr
+{
     let string_val = get_string_cell(row, pos, errors).unwrap_or(DEFAULT_NODE_NAME.to_string());
-    match string_val.parse::<u32>() {
+    match string_val.parse::<T>() {
         Ok(x) => {
             Some(x)
         }
-        Err(e) => {
-            errors.push(CellNotNumericError {
-                    row_i: pos.1,
-                    cell_i: pos.0,
-                    cell_val: &string_val,
-                    val: 0u32
-                }.to_string()
+        Err(_e) => {
+            errors.push(
+                CellNotNumericError::<T> { row_i: pos.1, cell_i: pos.0, cell_val: string_val, ..Default::default() }.to_string()
             );
-            errors.push(format!("\t{}", e));
             None
         }
     }
